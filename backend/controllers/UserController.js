@@ -1,7 +1,6 @@
 const User = require("../models/UserModel");
 const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
-const register = async (req, res) => {
+const jwt = require("jsonwebtoken");const register = async (req, res) => {
     try {
         const { name, email, password, role, staffEmail } = req.body;
 
@@ -12,53 +11,53 @@ const register = async (req, res) => {
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // 🔹 STAFF
-        if (role === "staff") {
-            const user = await User.create({
+        // 🔹 ADMIN (creates group)
+        if (role === "admin") {
+
+            const admin = await User.create({
                 name,
                 email,
                 password: hashedPassword,
                 role
             });
 
-            user.staffId = user._id;
-            await user.save();
+            // 🔥 admin owns group
+            admin.staffId = admin._id;
+            await admin.save();
 
-            const token = jwt.sign(
-                { id: user._id },
-                process.env.JWT_SECRET
-            );
+            const token = jwt.sign({ id: admin._id }, process.env.JWT_SECRET);
 
-            return res.json({ user, token });
+            return res.json({ user: admin, token });
         }
 
-        // 🔹 ADMIN
-        if (role === "admin") {
+        // 🔹 STAFF (must join admin)
+        if (role === "staff") {
 
             if (!staffEmail) {
-                return res.status(400).json({ message: "Staff email required" });
+                return res.status(400).json({
+                    message: "Admin email required"
+                });
             }
 
-            const staff = await User.findOne({ email: staffEmail });
+            const admin = await User.findOne({ email: staffEmail });
 
-            if (!staff || staff.role !== "staff") {
-                return res.status(400).json({ message: "Invalid staff email" });
+            if (!admin || admin.role !== "admin") {
+                return res.status(400).json({
+                    message: "Invalid admin email"
+                });
             }
 
-            const admin = await User.create({
+            const staff = await User.create({
                 name,
                 email,
                 password: hashedPassword,
                 role,
-                staffId: staff._id
+                staffId: admin.staffId   // 🔥 SAME GROUP
             });
 
-            const token = jwt.sign(
-                { id: admin._id },
-                process.env.JWT_SECRET
-            );
+            const token = jwt.sign({ id: staff._id }, process.env.JWT_SECRET);
 
-            return res.json({ user: admin, token });
+            return res.json({ user: staff, token });
         }
 
     } catch (error) {
