@@ -11,155 +11,137 @@ import { useAuth } from '../context/AuthContext';
 import Input from '../components/common/Input';
 import Button from '../components/common/Button';
 
+// ✅ UPDATED SCHEMA
 const schema = yup.object({
   name: yup.string().required('Full name is required'),
   email: yup.string().email('Invalid email address').required('Email is required'),
   password: yup.string().min(6, 'Password must be at least 6 characters').required('Password is required'),
   role: yup.string().oneOf(['admin', 'staff'], 'Invalid role').required('Role is required'),
+
+  // 🔥 NEW FIELD
+  staffEmail: yup.string().when('role', {
+    is: 'admin',
+    then: (schema) => schema.required('Staff email is required'),
+    otherwise: (schema) => schema.notRequired(),
+  }),
 }).required();
 
 const Register = () => {
   const { register: registerAction } = useAuth();
   const navigate = useNavigate();
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({
+  const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm({
     resolver: yupResolver(schema),
     defaultValues: {
       role: 'staff'
     }
   });
 
+  // 🔥 WATCH ROLE
+  const role = watch('role');
+
   const onSubmit = async (data) => {
     try {
-      await registerAction(data.name, data.email, data.password, data.role);
+      await registerAction(
+        data.name,
+        data.email,
+        data.password,
+        data.role,
+        data.staffEmail   // 🔥 PASS THIS
+      );
+
       toast.success('Account created successfully!');
       navigate('/dashboard');
     } catch (error) {
       console.error(error);
-      const message = error.response?.data?.message || 'Registration failed. Please try again.';
+      const message = error.response?.data?.message || 'Registration failed.';
       toast.error(message);
     }
   };
 
   return (
     <div className="min-h-screen w-full flex bg-gray-50">
-      {/* Left Side - Brand/Image */}
-      <div className="hidden lg:flex lg:w-1/2 bg-brand-900 relative overflow-hidden items-center justify-center">
-        <div className="absolute inset-0 bg-gradient-to-br from-brand-600 to-brand-900 opacity-90"></div>
-        <div className="relative z-10 text-white p-12 text-center">
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8 }}
-            >
-                <UserPlus size={80} className="mx-auto mb-6 text-brand-200" />
-                <h1 className="text-4xl font-bold mb-4">Join Our System</h1>
-                <p className="text-xl text-brand-100 max-w-md mx-auto">
-                    Create an account to start managing your inventory and tracking stock movements.
-                </p>
-            </motion.div>
+
+      {/* LEFT SIDE */}
+      <div className="hidden lg:flex lg:w-1/2 bg-brand-900 items-center justify-center">
+        <div className="text-white text-center p-12">
+          <UserPlus size={80} className="mx-auto mb-6 text-brand-200" />
+          <h1 className="text-4xl font-bold mb-4">Join Our System</h1>
+          <p className="text-xl text-brand-100">
+            Manage your inventory easily
+          </p>
         </div>
-        
-        <div className="absolute -top-20 -left-20 w-64 h-64 bg-brand-500 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob"></div>
-        <div className="absolute -bottom-20 -right-20 w-64 h-64 bg-brand-400 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob animation-delay-2000"></div>
       </div>
 
-      {/* Right Side - Form */}
-      <div className="flex-1 flex items-center justify-center p-8 overflow-y-auto">
-        <motion.div 
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5 }}
-            className="w-full max-w-md py-8"
-        >
-          <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
-            <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-gray-900">Create new account</h2>
-              <p className="text-gray-500 mt-2">Fill in the details to register</p>
+      {/* RIGHT SIDE */}
+      <div className="flex-1 flex items-center justify-center p-8">
+        <div className="w-full max-w-md bg-white p-8 rounded-xl shadow">
+
+          <h2 className="text-2xl font-bold text-center mb-6">
+            Create new account
+          </h2>
+
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+
+            <Input
+              label="Full Name"
+              {...register('name')}
+              error={errors.name}
+            />
+
+            <Input
+              label="Email"
+              type="email"
+              {...register('email')}
+              error={errors.email}
+            />
+
+            <Input
+              label="Password"
+              type="password"
+              {...register('password')}
+              error={errors.password}
+            />
+
+            {/* ROLE */}
+            <div>
+              <label className="block mb-2 font-medium">Role</label>
+              <div className="flex gap-4">
+                <label>
+                  <input type="radio" value="staff" {...register('role')} />
+                  Staff
+                </label>
+                <label>
+                  <input type="radio" value="admin" {...register('role')} />
+                  Admin
+                </label>
+              </div>
             </div>
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+            {/* 🔥 STAFF EMAIL (ONLY ADMIN) */}
+            {role === 'admin' && (
               <Input
-                label="Full Name"
-                type="text"
-                placeholder="John Doe"
-                error={errors.name}
-                {...register('name')}
-              />
-
-              <Input
-                label="Email Address"
+                label="Staff Email"
                 type="email"
-                placeholder="john@example.com"
-                error={errors.email}
-                {...register('email')}
+                placeholder="Enter staff email"
+                {...register('staffEmail')}
+                error={errors.staffEmail}
               />
+            )}
 
-              <Input
-                label="Password"
-                type="password"
-                placeholder="••••••••"
-                error={errors.password}
-                {...register('password')}
-              />
+            <Button type="submit" isLoading={isSubmitting}>
+              Register
+            </Button>
 
-              <div className="w-full">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="relative">
-                    <input
-                      type="radio"
-                      id="role-staff"
-                      value="staff"
-                      className="peer hidden"
-                      {...register('role')}
-                    />
-                    <label 
-                      htmlFor="role-staff"
-                      className="flex items-center justify-center p-3 border-2 border-gray-100 rounded-xl cursor-pointer transition-all hover:bg-gray-50 peer-checked:border-brand-600 peer-checked:bg-brand-50 peer-checked:text-brand-600 font-medium text-gray-500"
-                    >
-                      Staff
-                    </label>
-                  </div>
-                  <div className="relative">
-                    <input
-                      type="radio"
-                      id="role-admin"
-                      value="admin"
-                      className="peer hidden"
-                      {...register('role')}
-                    />
-                    <label 
-                      htmlFor="role-admin"
-                      className="flex items-center justify-center p-3 border-2 border-gray-100 rounded-xl cursor-pointer transition-all hover:bg-gray-50 peer-checked:border-brand-600 peer-checked:bg-brand-50 peer-checked:text-brand-600 font-medium text-gray-500"
-                    >
-                      Admin
-                    </label>
-                  </div>
-                </div>
-                {errors.role && (
-                    <p className="mt-1 text-sm text-red-600 animate-pulse">{errors.role.message}</p>
-                )}
-              </div>
+            <p className="text-center text-sm">
+              Already have an account?{' '}
+              <Link to="/login" className="text-blue-600">
+                Sign in
+              </Link>
+            </p>
 
-              <Button
-                type="submit"
-                className="w-full mt-4"
-                size="lg"
-                isLoading={isSubmitting}
-              >
-                Register
-              </Button>
-
-              <p className="text-center text-sm text-gray-600 mt-4">
-                Already have an account?{' '}
-                <Link to="/login" className="font-semibold text-brand-600 hover:underline">
-                  Sign in
-                </Link>
-              </p>
-            </form>
-          </div>
-        </motion.div>
+          </form>
+        </div>
       </div>
     </div>
   );

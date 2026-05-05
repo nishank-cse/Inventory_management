@@ -3,17 +3,28 @@ import api from './api';
 const authService = {
   login: async (email, password) => {
     const response = await api.post('/auth/login', { email, password });
+
     if (response.data.token) {
       localStorage.setItem('token', response.data.token);
     }
+
     return response.data;
   },
 
-  register: async (name, email, password, role) => {
-    const response = await api.post('/auth/register', { name, email, password, role });
+  // 🔥 UPDATED REGISTER
+  register: async (name, email, password, role, staffEmail) => {
+    const response = await api.post('/auth/register', {
+      name,
+      email,
+      password,
+      role,
+      staffEmail
+    });
+
     if (response.data.token) {
       localStorage.setItem('token', response.data.token);
     }
+
     return response.data;
   },
 
@@ -29,7 +40,7 @@ const authService = {
       return null;
     }
   },
-  
+
   isAuthenticated: () => {
     return !!localStorage.getItem('token');
   }

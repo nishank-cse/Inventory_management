@@ -20,7 +20,14 @@ const userSchema = new Schema({
        type: String,
        enum: ["staff", "admin"],
        default: "staff"
+   },
+
+   // 🔥 ADD THIS
+   staffId: {
+       type: mongoose.Schema.Types.ObjectId,
+       ref: "User"
    }
+
 },{timestamps: true});
 
 // Export the model 

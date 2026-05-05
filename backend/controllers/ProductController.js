@@ -2,20 +2,29 @@ const asyncHandler = require("../utils/AsyncHandler");
 const Product = require("../models/ProductModel");
 const StockHistory = require("../models/StockHistoryModel");
 
-// @desc    Create a product
-// @route   POST /api/products
-// @access  Private (Admin)
+// ================= CREATE PRODUCT =================
+// Admin only
 const createProduct = asyncHandler(async (req, res) => {
+
+    if (req.user.role !== "admin") {
+        res.status(403);
+        throw new Error("Admin only");
+    }
+
     const { name, sku, category, price, quantity, minStock, description, supplier } = req.body;
 
-    const productExists = await Product.findOne({ name, user: req.user.id });
+    const productExists = await Product.findOne({
+        name,
+        staff: req.user.staffId
+    });
+
     if (productExists) {
         res.status(400);
-        throw new Error("Product with this name already exists in your inventory");
+        throw new Error("Product already exists");
     }
 
     const product = await Product.create({
-        user: req.user.id,
+        staff: req.user.staffId,
         name,
         sku,
         category,
@@ -26,13 +35,12 @@ const createProduct = asyncHandler(async (req, res) => {
         supplier,
     });
 
-    // Log initial stock as IN if quantity > 0
     if (quantity > 0) {
         await StockHistory.create({
-            user: req.user.id,
+            staff: req.user.staffId,
             productId: product._id,
             type: "IN",
-            quantity: quantity,
+            quantity,
             reason: "Initial Stock",
         });
     }
@@ -40,100 +48,132 @@ const createProduct = asyncHandler(async (req, res) => {
     res.status(201).json(product);
 });
 
-// @desc    Get all products
-// @route   GET /api/products
-// @access  Private
+
+// ================= GET ALL PRODUCTS =================
 const getProducts = asyncHandler(async (req, res) => {
-    const products = await Product.find({ user: req.user.id }).sort("-createdAt");
+    const products = await Product.find({
+        staff: req.user.staffId
+    }).sort("-createdAt");
+
     res.status(200).json(products);
 });
 
-// @desc    Get single product
-// @route   GET /api/products/:id
-// @access  Private
+
+// ================= GET SINGLE PRODUCT =================
 const getProductById = asyncHandler(async (req, res) => {
-    const product = await Product.findOne({ _id: req.params.id, user: req.user.id });
+
+    const product = await Product.findOne({
+        _id: req.params.id,
+        staff: req.user.staffId
+    });
+
     if (!product) {
         res.status(404);
-        throw new Error("Product not found in your inventory");
+        throw new Error("Product not found");
     }
+
     res.status(200).json(product);
 });
 
-// @desc    Update product
-// @route   PUT /api/products/:id
-// @access  Private (Admin)
+
+// ================= UPDATE PRODUCT =================
+// Admin only
 const updateProduct = asyncHandler(async (req, res) => {
+
+    if (req.user.role !== "admin") {
+        res.status(403);
+        throw new Error("Admin only");
+    }
+
     const { name, sku, category, price, quantity, minStock, description, supplier } = req.body;
-    const product = await Product.findOne({ _id: req.params.id, user: req.user.id });
+
+    const product = await Product.findOne({
+        _id: req.params.id,
+        staff: req.user.staffId
+    });
 
     if (!product) {
         res.status(404);
-        throw new Error("Product not found in your inventory");
+        throw new Error("Product not found");
     }
 
-    // Check if updating name and if it already exists (excluding current product)
+    // Check duplicate name
     if (name && name !== product.name) {
-        const productExists = await Product.findOne({ name, user: req.user.id });
-        if (productExists) {
+        const exists = await Product.findOne({
+            name,
+            staff: req.user.staffId
+        });
+
+        if (exists) {
             res.status(400);
-            throw new Error("Product name already exists in your inventory");
+            throw new Error("Product name already exists");
         }
     }
 
     // Update fields
     product.name = name || product.name;
-    product.sku = sku !== undefined ? sku : product.sku;
+    product.sku = sku ?? product.sku;
     product.category = category || product.category;
-    product.price = price !== undefined ? price : product.price;
-    product.minStock = minStock !== undefined ? minStock : product.minStock;
+    product.price = price ?? product.price;
+    product.minStock = minStock ?? product.minStock;
     product.description = description || product.description;
     product.supplier = supplier || product.supplier;
-    
-    // Note: Quantity is usually updated via stock operations, but allowing manual override here implementation choice.
-    // For strict inventory, maybe disable direct quantity update? 
-    // Allowing it for correction purposes, but logging difference would be ideal.
-    // For simplicity following user plan likely expects simple CRUD.
+
+    // Handle quantity change
     if (quantity !== undefined) {
-        const diff = Number(quantity) - product.quantity;
+        const diff = quantity - product.quantity;
+
         if (diff !== 0) {
-             await StockHistory.create({
-                user: req.user.id,
+            await StockHistory.create({
+                staff: req.user.staffId,
                 productId: product._id,
                 type: diff > 0 ? "IN" : "OUT",
                 quantity: Math.abs(diff),
                 reason: "Manual Adjustment",
             });
+
             product.quantity = quantity;
         }
     }
 
-    const updatedProduct = await product.save();
-    res.status(200).json(updatedProduct);
+    const updated = await product.save();
+    res.status(200).json(updated);
 });
 
-// @desc    Delete product
-// @route   DELETE /api/products/:id
-// @access  Private (Admin)
+
+// ================= DELETE PRODUCT =================
+// Admin only
 const deleteProduct = asyncHandler(async (req, res) => {
-    const product = await Product.findOne({ _id: req.params.id, user: req.user.id });
+
+    if (req.user.role !== "admin") {
+        res.status(403);
+        throw new Error("Admin only");
+    }
+
+    const product = await Product.findOne({
+        _id: req.params.id,
+        staff: req.user.staffId
+    });
+
     if (!product) {
         res.status(404);
-        throw new Error("Product not found in your inventory");
+        throw new Error("Product not found");
     }
-    
-    // Use deleteOne() instead of remove() which is deprecated
-    await product.deleteOne();
-    // Also remove history for this product
-    await StockHistory.deleteMany({ productId: req.params.id, user: req.user.id });
 
-    res.status(200).json({ message: "Product deleted and history cleared" });
+    await product.deleteOne();
+
+    await StockHistory.deleteMany({
+        productId: req.params.id,
+        staff: req.user.staffId
+    });
+
+    res.status(200).json({ message: "Deleted successfully" });
 });
 
-// @desc    Stock In
-// @route   POST /api/stock/in
-// @access  Private (Admin/Staff)
+
+// ================= STOCK IN =================
 const stockIn = asyncHandler(async (req, res) => {
+
     const { productId, quantity, reason } = req.body;
 
     if (!quantity || quantity <= 0) {
@@ -141,30 +181,37 @@ const stockIn = asyncHandler(async (req, res) => {
         throw new Error("Invalid quantity");
     }
 
-    const product = await Product.findOne({ _id: productId, user: req.user.id });
+    const product = await Product.findOne({
+        _id: productId,
+        staff: req.user.staffId
+    });
+
     if (!product) {
         res.status(404);
-        throw new Error("Product not found in your inventory");
+        throw new Error("Product not found");
     }
 
     product.quantity += Number(quantity);
     await product.save();
 
     await StockHistory.create({
-        user: req.user.id,
+        staff: req.user.staffId,
         productId,
         type: "IN",
         quantity,
         reason,
     });
 
-    res.status(200).json({ message: "Stock In successful", currentQuantity: product.quantity });
+    res.status(200).json({
+        message: "Stock In successful",
+        currentQuantity: product.quantity
+    });
 });
 
-// @desc    Stock Out
-// @route   POST /api/stock/out
-// @access  Private (Admin/Staff)
+
+// ================= STOCK OUT =================
 const stockOut = asyncHandler(async (req, res) => {
+
     const { productId, quantity, reason } = req.body;
 
     if (!quantity || quantity <= 0) {
@@ -172,10 +219,14 @@ const stockOut = asyncHandler(async (req, res) => {
         throw new Error("Invalid quantity");
     }
 
-    const product = await Product.findOne({ _id: productId, user: req.user.id });
+    const product = await Product.findOne({
+        _id: productId,
+        staff: req.user.staffId
+    });
+
     if (!product) {
         res.status(404);
-        throw new Error("Product not found in your inventory");
+        throw new Error("Product not found");
     }
 
     if (product.quantity < quantity) {
@@ -187,41 +238,43 @@ const stockOut = asyncHandler(async (req, res) => {
     await product.save();
 
     await StockHistory.create({
-        user: req.user.id,
+        staff: req.user.staffId,
         productId,
         type: "OUT",
         quantity,
         reason,
     });
 
-    res.status(200).json({ message: "Stock Out successful", currentQuantity: product.quantity });
-});
-
-// @desc    Get Stock History
-// @route   GET /api/stock/history
-// @access  Private
-const getStockHistory = asyncHandler(async (req, res) => {
-    const history = await StockHistory.find({ user: req.user.id }).populate("productId", "name").sort("-createdAt");
-    
-    // Map to ensure frontend gets item.product.name while keeping item.productId for any other use
-    const historyWithProduct = history.map(item => {
-        const historyObj = item.toObject();
-        return {
-            ...historyObj,
-            product: historyObj.productId // This makes item.product.name available
-        };
+    res.status(200).json({
+        message: "Stock Out successful",
+        currentQuantity: product.quantity
     });
-
-    res.status(200).json(historyWithProduct);
 });
 
-// @desc    Get Low Stock Products
-// @route   GET /api/products/low-stock
-// @access  Private
+
+// ================= STOCK HISTORY =================
+const getStockHistory = asyncHandler(async (req, res) => {
+
+    const history = await StockHistory.find({
+        staff: req.user.staffId
+    })
+    .populate("productId", "name")
+    .sort("-createdAt");
+
+    const formatted = history.map(item => ({
+        ...item.toObject(),
+        product: item.productId
+    }));
+
+    res.status(200).json(formatted);
+});
+
+
+// ================= LOW STOCK =================
 const getLowStockProducts = asyncHandler(async (req, res) => {
-    // Find products where quantity is low (<= 10) OR less than or equal to custom minStock
+
     const products = await Product.find({
-        user: req.user.id,
+        staff: req.user.staffId,
         $or: [
             { $expr: { $lte: ["$quantity", "$minStock"] } },
             { quantity: { $lte: 10 } }
@@ -231,6 +284,8 @@ const getLowStockProducts = asyncHandler(async (req, res) => {
     res.status(200).json(products);
 });
 
+
+// ================= EXPORT =================
 module.exports = {
     createProduct,
     getProducts,
