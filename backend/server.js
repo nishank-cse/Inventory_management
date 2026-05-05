@@ -34,7 +34,8 @@ app.use(limiter);
 app.use(cors({
   origin: [
     "http://localhost:5173",
-    "https://inventory-management-beta-ashy.vercel.app"
+    "https://inventory-management-beta-ashy.vercel.app",
+    "https://inventory-management-git-main-nishank-mukhijas-projects.vercel.app"
   ],
   credentials: true
 }));
