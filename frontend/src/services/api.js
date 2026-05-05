@@ -1,16 +1,20 @@
-import axios from 'axios';
+import axios from "axios";
+
+const API_URL =
+  import.meta.env.VITE_API_URL ||
+  "https://inventory-management-0kvz.onrender.com";
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  baseURL: API_URL,
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
 });
 
-// Add auth token to requests
+// 🔐 Attach token
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem("token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -19,14 +23,16 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Handle specific response errors (e.g., 401 logout)
+// ⚠️ Handle errors
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && error.response.status === 401) {
-      // Clear storage if unauthorized (token invalid)
-      // We might dispatch a logout action if we had access to store/context here
-      // For now, we'll let the component/context handle the redirect
+    if (error.response?.status === 401) {
+      console.warn("Unauthorized - Token expired");
+
+      // optional logout
+      localStorage.removeItem("token");
+      window.location.href = "/login";
     }
     return Promise.reject(error);
   }

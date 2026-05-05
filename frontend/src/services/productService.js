@@ -2,32 +2,32 @@ import api from './api';
 
 const productService = {
   getAll: async (params) => {
-    const response = await api.get('/products', { params });
+    const response = await api.get('/api/products', { params });
     return response.data;
   },
 
   getById: async (id) => {
-    const response = await api.get(`/products/${id}`);
+    const response = await api.get(`/api/products/${id}`);
     return response.data;
   },
 
   create: async (data) => {
-    const response = await api.post('/products', data);
+    const response = await api.post('/api/products', data);
     return response.data;
   },
 
   update: async (id, data) => {
-    const response = await api.put(`/products/${id}`, data);
+    const response = await api.put(`/api/products/${id}`, data);
     return response.data;
   },
 
   delete: async (id) => {
-    const response = await api.delete(`/products/${id}`);
+    const response = await api.delete(`/api/products/${id}`);
     return response.data;
   },
 
   getLowStock: async () => {
-    const response = await api.get('/products/low-stock');
+    const response = await api.get('/api/products/low-stock');
     return response.data;
   }
 };
