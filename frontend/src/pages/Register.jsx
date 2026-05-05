@@ -3,25 +3,24 @@ import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { useNavigate, Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { toast } from 'react-hot-toast';
-import { LayoutDashboard, UserPlus } from 'lucide-react';
+import { UserPlus } from 'lucide-react';
 
 import { useAuth } from '../context/AuthContext';
 import Input from '../components/common/Input';
 import Button from '../components/common/Button';
 
-// ✅ UPDATED SCHEMA
+// ✅ FIXED SCHEMA
 const schema = yup.object({
   name: yup.string().required('Full name is required'),
   email: yup.string().email('Invalid email address').required('Email is required'),
   password: yup.string().min(6, 'Password must be at least 6 characters').required('Password is required'),
-  role: yup.string().oneOf(['admin', 'staff'], 'Invalid role').required('Role is required'),
+  role: yup.string().oneOf(['admin', 'staff']).required(),
 
-  // 🔥 NEW FIELD
-  staffEmail: yup.string().when('role', {
-    is: 'admin',
-    then: (schema) => schema.required('Staff email is required'),
+  // 🔥 ONLY REQUIRED FOR STAFF
+  adminEmail: yup.string().when('role', {
+    is: 'staff',
+    then: (schema) => schema.required('Admin email is required'),
     otherwise: (schema) => schema.notRequired(),
   }),
 }).required();
@@ -30,14 +29,18 @@ const Register = () => {
   const { register: registerAction } = useAuth();
   const navigate = useNavigate();
 
-  const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm({
+  const {
+    register,
+    handleSubmit,
+    watch,
+    formState: { errors, isSubmitting }
+  } = useForm({
     resolver: yupResolver(schema),
     defaultValues: {
       role: 'staff'
     }
   });
 
-  // 🔥 WATCH ROLE
   const role = watch('role');
 
   const onSubmit = async (data) => {
@@ -47,14 +50,14 @@ const Register = () => {
         data.email,
         data.password,
         data.role,
-        data.staffEmail   // 🔥 PASS THIS
+        data.adminEmail // 🔥 FIXED
       );
 
       toast.success('Account created successfully!');
       navigate('/dashboard');
+
     } catch (error) {
-      console.error(error);
-      const message = error.response?.data?.message || 'Registration failed.';
+      const message = error.response?.data?.message || 'Registration failed';
       toast.error(message);
     }
   };
@@ -63,13 +66,11 @@ const Register = () => {
     <div className="min-h-screen w-full flex bg-gray-50">
 
       {/* LEFT SIDE */}
-      <div className="hidden lg:flex lg:w-1/2 bg-brand-900 items-center justify-center">
+      <div className="hidden lg:flex lg:w-1/2 bg-blue-900 items-center justify-center">
         <div className="text-white text-center p-12">
-          <UserPlus size={80} className="mx-auto mb-6 text-brand-200" />
+          <UserPlus size={80} className="mx-auto mb-6" />
           <h1 className="text-4xl font-bold mb-4">Join Our System</h1>
-          <p className="text-xl text-brand-100">
-            Manage your inventory easily
-          </p>
+          <p className="text-xl">Manage your inventory easily</p>
         </div>
       </div>
 
@@ -118,14 +119,14 @@ const Register = () => {
               </div>
             </div>
 
-            {/* 🔥 STAFF EMAIL (ONLY ADMIN) */}
-            {role === 'admin' && (
+            {/* 🔥 ADMIN EMAIL (ONLY FOR STAFF) */}
+            {role === 'staff' && (
               <Input
-                label="Staff Email"
+                label="Admin Email"
                 type="email"
-                placeholder="Enter staff email"
-                {...register('staffEmail')}
-                error={errors.staffEmail}
+                placeholder="Enter admin email"
+                {...register('adminEmail')}
+                error={errors.adminEmail}
               />
             )}
 
